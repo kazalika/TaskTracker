@@ -1,0 +1,21 @@
+@startuml containers_diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/latest/C4_Container.puml
+
+Person(user, "User", "Пользователь трекера задач.")
+Container(taskTrackerApi, "Task Tracker API", "Go", "Отвечает за регистрацию и аутентификацию пользователей, пересылает запросы")
+ContainerDb(userDatabase, "User Database", "Database", "Хранит данные для аутентификации и регистрации пользователей.")
+Container(statisticsService, "Statistics Service", "Go", "Обрабатывает статистику по задачам.")
+ContainerDb(statisticsDatabase, "Statistics Database", "ClickHouse", "Хранит статистику просмотров и лайков.")
+Container(commentService, "Comment Service", "Go", "Обрабатывает комментарии пользователей.")
+ContainerDb(commentDatabase, "Comment Database", "Database", "Хранит комментарии и их иерархию.")
+Container(broker, "Message Broker", "Kafka", "Передает события в сервис статистики.")
+
+Rel(user, taskTrackerApi, "Send requests", "HTTPS")
+Rel(taskTrackerApi, userDatabase, "Reads/Writes")
+Rel(taskTrackerApi, statisticsService, "Invokes", "gRPC")
+Rel(taskTrackerApi, commentService, "Invokes", "gRPC")
+Rel(broker, statisticsService, "Send", "binary protocol over TCP")
+Rel(commentService, commentDatabase, "Reads/Writes")
+Rel(commentService, broker, "Publishes", "binary protocol over TCP")
+Rel(statisticsService, statisticsDatabase, "Reads/Writes")
+@enduml

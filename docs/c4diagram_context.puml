@@ -1,0 +1,8 @@
+@startuml context_diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/latest/C4_Context.puml
+
+Person(user, "Пользователь", "Пользователь трекера задач")
+System(taskTrackerSystem, "Трекер задач", "Пользователи могут регистрироваться, создавать, обновлять, удалять задачи, получать задачи сгруппированные по статусам, оставлять комментарии, ставить лайки и смотреть статистику по просмотрам и лайкам")
+
+Rel(user, taskTrackerSystem, "Используют описанный ниже функционал")
+@enduml

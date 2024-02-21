@@ -1,0 +1,49 @@
+@startuml er_diagram
+!define Table(name,desc) class name as "desc" << (T,green) >>
+!define foreign_key(x) <color:blue>x</color>
+!define primary_key(x) <u>x</u>
+
+Table(user, "User") {
+    +primary_key(id) : int
+    ---
+    +username : varchar
+    +password : varchar
+    +email : varchar
+}
+
+Table(task, "Task") {
+    +primary_key(id) : int
+    +foreign_key(user_id) : int
+    ---
+    +title : varchar
+    +description : text
+    +status : varchar
+}
+
+Table(statistic, "Statistic") {
+    +primary_key(id) : int
+    +foreign_key(task_id) : int
+    ---
+    +views : int
+    +likes : int
+}
+
+Table(comment, "Comment") {
+    +primary_key(id) : int
+    +foreign_key(task_id) : int
+    +foreign_key(user_id) : int
+    +foreign_key(parent_id) : int
+    ---
+    +text : text
+    +created_at : datetime
+}
+
+
+user ---- task
+user ---- comment
+
+task ---- statistic
+task ---- comment
+
+comment ---- comment
+@enduml
