@@ -1,4 +1,4 @@
-module auth/redis
+module github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis
 
 go 1.18
 

@@ -14,8 +14,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"auth/redis"
 	"encoding/json"
+
+	"github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis"
 
 	"github.com/golang-jwt/jwt/v5"
 )

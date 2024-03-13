@@ -9,18 +9,19 @@
 package main
 
 import (
-	"auth/redis"
 	"log"
 	"net/http"
+
+	"github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis"
 
 	// WARNING!
 	// Change this to a fully-qualified import path
 	// once you place this file into your project.
 	// For example,
 	//
-	//    sw "github.com/myname/myrepo/go"
+	sw "github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/go"
 	//
-	sw "sw"
+	// sw "sw"
 )
 
 func main() {

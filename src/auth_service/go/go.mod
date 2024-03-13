@@ -1,9 +1,9 @@
-module auth/handlers
+module github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/go
 
 go 1.18
 
 require (
-	auth/redis v0.0.0-00010101000000-000000000000
+	github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis v0.0.0-00010101000000-000000000000
 	github.com/gorilla/mux v1.8.1
 )
 
@@ -14,4 +14,4 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 )
 
-replace auth/redis => ../redis
+replace github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis => ../redis
