@@ -15,7 +15,7 @@ var rdb *redis.Client
 
 func InitRedisClient() {
 	rdb = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "redis:6379",
 		Password: "", // Если требуется
 		DB:       0,  // Номер БД в Redis, по умолчанию 0
 	})
@@ -31,6 +31,8 @@ type JWTHandlers struct {
 }
 
 func NewAuthHandlers(jwtprivateFile string, jwtPublicFile string) *JWTHandlers {
+	fmt.Fprintln(os.Stderr, "Creating JWT handlers")
+
 	private, err := os.ReadFile(jwtprivateFile)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -62,16 +64,9 @@ func NewAuthHandlers(jwtprivateFile string, jwtPublicFile string) *JWTHandlers {
 var h *JWTHandlers
 
 func InitJWTHandlers() {
-	privateFile := flag.String("private", "/tmp/signature.pem", "path to JWT private key `file`")
-	publicFile := flag.String("public", "/tmp/signature.pub", "path to JWT public key `file`")
-	port := flag.Int("port", 8091, "http server port")
-
+	privateFile := flag.String("private", "/auth_service/redis/signature/private_key.pem", "path to JWT private key `file`")
+	publicFile := flag.String("public", "/auth_service/redis/signature/public_key.pem", "path to JWT public key `file`")
 	flag.Parse()
-
-	if port == nil {
-		fmt.Fprintln(os.Stderr, "Port is required")
-		os.Exit(1)
-	}
 
 	if privateFile == nil || *privateFile == "" {
 		fmt.Fprintln(os.Stderr, "Please provide a path to JWT private key file")

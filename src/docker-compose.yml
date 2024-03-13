@@ -2,7 +2,9 @@ version: '3.7'
 
 services:
   auth:
-    build: ./auth_service
+    build: 
+      context: ./auth_service
+      # dockerfile: auth_service.dockerfile
     ports:
       - "8080:8080"
     depends_on:
@@ -15,7 +17,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:./auth_data
+      - redis-data:/auth_data
 
 volumes:
   redis-data:

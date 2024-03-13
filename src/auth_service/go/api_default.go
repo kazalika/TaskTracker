@@ -10,6 +10,7 @@ package swagger
 
 import (
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"net/http"
@@ -30,11 +31,11 @@ func GetUserData(username string, toSaveMap *map[string]string) (int, error) {
 	}
 
 	// Преобразуем JSON в структуру UserData
-	storedUserData := make(map[string]string)
-	err = json.Unmarshal([]byte(storedUserDataJSON), &storedUserData)
+	err = json.Unmarshal([]byte(storedUserDataJSON), &toSaveMap)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
+	// fmt.Println("decoded from Redis: ", storedUserData)
 	return 0, nil
 }
 
@@ -62,7 +63,7 @@ func StoreUserData(username string, data map[string]string) (int, error) {
 	// Сохраняем данные в Redis
 	err = rdb.Set(context.Background(), username, newUserDataJSON, 0).Err()
 	if err != nil {
-		return http.StatusInternalServerError, errors.New("error in saving to DB")
+		return http.StatusInternalServerError, err
 	}
 	return 0, nil
 }
@@ -72,6 +73,11 @@ func CheckIfUserExists(username string) bool {
 	// Проверяем, существует ли пользователь в Redis
 	_, err := rdb.Get(context.Background(), username).Result()
 	return err == nil
+}
+
+func HashPassword(password string) string {
+	hash := md5.Sum([]byte(password + "SALT"))
+	return fmt.Sprintf("%x", hash)
 }
 
 func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +100,7 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, совпадают ли пароли и есть ли в структуре вообще
 	storedPassword, ok := storedUserData["password"]
-	if !ok || storedPassword != creds.Password {
+	if !ok || storedPassword != HashPassword(creds.Password) {
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
@@ -150,8 +156,7 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 
 	// Создаем данные для нового пользователя в Redis
 	newUserData := map[string]string{
-		"username": creds.Username,
-		"password": creds.Password,
+		"password": HashPassword(creds.Password),
 		"token":    tokenString,
 	}
 	code, err := StoreUserData(creds.Username, newUserData)
@@ -172,7 +177,7 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 func UpdatePut(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	cookie, err := r.Cookie("jwt")
+	cookie, err := r.Cookie("token")
 	if err != nil {
 		http.Error(w, "No cookie", http.StatusUnauthorized)
 		return

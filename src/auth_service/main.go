@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -29,6 +30,15 @@ func main() {
 
 	redis.InitRedisClient()
 	redis.InitJWTHandlers()
+
+	rdb := redis.GetRedisClient()
+	rdb.Set(context.Background(), "key", "value", 0)
+	val, err := rdb.Get(context.Background(), "key").Result()
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		log.Printf("Value: %v", val)
+	}
 
 	router := sw.NewRouter()
 
