@@ -1,0 +1,122 @@
+openapi: 3.0.0
+info:
+  title: Пример API
+  version: 1.0.0
+servers:
+- url: /
+paths:
+  /register:
+    post:
+      summary: Регистрация нового пользователя через логин и пароль
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/register_body'
+        required: true
+      responses:
+        "200":
+          description: Успешная регистрация пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200'
+        "403":
+          description: Пользователь с таким логином уже зарегистрирован
+  /update:
+    put:
+      summary: Аутентификация и обновление информации пользователя
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/update_body'
+        required: false
+      responses:
+        "200":
+          description: Данные пользователя успешно обновлены
+      security:
+      - cookieAuth: []
+  /authenticate:
+    post:
+      summary: Аутентификация в систему по логину и паролю
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/authenticate_body'
+        required: true
+      responses:
+        "200":
+          description: Успешная аутентификация
+          headers:
+            Set-Cookie:
+              description: Куки для хранения токена
+              style: simple
+              explode: false
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+components:
+  schemas:
+    register_body:
+      required:
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    update_body:
+      type: object
+      properties:
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        birthday:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phoneNumber:
+          type: string
+          nullable: true
+    inline_response_200_1:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Успешная аутентификация. Токен отправлен через Cookie.
+      example:
+        message: Успешная аутентификация. Токен отправлен через Cookie.
+    inline_response_200:
+      type: object
+      properties:
+        token:
+          type: string
+      example:
+        token: token
+    authenticate_body:
+      required:
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      name: token
+      in: cookie
