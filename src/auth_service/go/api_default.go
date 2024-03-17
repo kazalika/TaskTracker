@@ -17,7 +17,8 @@ import (
 
 	"encoding/json"
 
-	"github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis"
+	"jwt_handlers"
+	"redis"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -40,7 +41,7 @@ func GetUserData(username string, toSaveMap *map[string]string) (int, error) {
 }
 
 func GenerateJWT(username string) (string, error) {
-	han := redis.GetJWTHandlers()
+	han := jwt_handlers.GetJWTHandlers()
 	payload := jwt.MapClaims{
 		"username": username,
 	}
@@ -183,7 +184,7 @@ func UpdatePut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Получаем доступ к ключам JWT
-	han := redis.GetJWTHandlers()
+	han := jwt_handlers.GetJWTHandlers()
 
 	// Получаем токен из Cookie
 	tokenString := cookie.Value

@@ -13,14 +13,15 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/redis"
+	"jwt_handlers"
+	"redis"
 
 	// WARNING!
 	// Change this to a fully-qualified import path
 	// once you place this file into your project.
 	// For example,
 	//
-	sw "github.com/kazalika/TaskTracker/tree/rest_api/src/auth_service/go"
+	sw "api_handlers"
 	//
 	// sw "sw"
 )
@@ -29,7 +30,7 @@ func main() {
 	log.Printf("Server started")
 
 	redis.InitRedisClient()
-	redis.InitJWTHandlers()
+	jwt_handlers.InitJWTHandlers()
 
 	rdb := redis.GetRedisClient()
 	rdb.Set(context.Background(), "key", "value", 0)
