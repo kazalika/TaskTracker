@@ -97,6 +97,7 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 	code, err := GetUserData(creds.Username, &storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
+		return
 	}
 
 	// Проверяем, совпадают ли пароли и есть ли в структуре вообще

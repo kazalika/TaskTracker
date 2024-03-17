@@ -10,6 +10,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const (
+	privateKeyPath = "/auth_service/jwt/signature/private_key.pem"
+	publicKeyPath  = "/auth_service/jwt/signature/public_key.pem"
+)
+
 type JWTHandlers struct {
 	JwtPrivate *rsa.PrivateKey
 	JwtPublic  *rsa.PublicKey
@@ -49,27 +54,15 @@ func NewAuthHandlers(jwtprivateFile string, jwtPublicFile string) *JWTHandlers {
 var h *JWTHandlers
 
 func InitJWTHandlers() {
-	privateFile := flag.String("private", "/auth_service/jwt/signature/private_key.pem", "path to JWT private key `file`")
-	publicFile := flag.String("public", "/auth_service/jwt/signature/public_key.pem", "path to JWT public key `file`")
 	flag.Parse()
 
-	if privateFile == nil || *privateFile == "" {
-		fmt.Fprintln(os.Stderr, "Please provide a path to JWT private key file")
-		os.Exit(1)
-	}
-
-	if publicFile == nil || *publicFile == "" {
-		fmt.Fprintln(os.Stderr, "Please provide a path to JWT public key file")
-		os.Exit(1)
-	}
-
-	absoluteprivateFile, err := filepath.Abs(*privateFile)
+	absoluteprivateFile, err := filepath.Abs(privateKeyPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	absolutePublicFile, err := filepath.Abs(*publicFile)
+	absolutePublicFile, err := filepath.Abs(publicKeyPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -26,19 +27,32 @@ import (
 	// sw "sw"
 )
 
+func TestRedisClient() error {
+	rdb := redis.GetRedisClient()
+	rdb.Set(context.Background(), "key", "value", 0)
+	val, err := rdb.Get(context.Background(), "key").Result()
+
+	if err != nil {
+		return err
+	}
+	if val != "value" {
+		return fmt.Errorf("wrong value in TestRedicClient %s", val)
+	}
+	return nil
+}
+
 func main() {
-	log.Printf("Server started")
+	log.Printf("Server starting")
 
 	redis.InitRedisClient()
 	jwt_handlers.InitJWTHandlers()
 
-	rdb := redis.GetRedisClient()
-	rdb.Set(context.Background(), "key", "value", 0)
-	val, err := rdb.Get(context.Background(), "key").Result()
+	err := TestRedisClient()
 	if err != nil {
 		log.Printf("Error: %v", err)
+		return
 	} else {
-		log.Printf("Value: %v", val)
+		log.Printf("TestRedisClient OK")
 	}
 
 	router := sw.NewRouter()
