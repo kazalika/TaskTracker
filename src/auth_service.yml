@@ -1,0 +1,123 @@
+openapi: 3.0.0
+info:
+  title: Пример API
+  version: 1.0.0
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+paths:
+  /register:
+    post:
+      summary: Регистрация нового пользователя через логин и пароль
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required: 
+                - username
+                - password
+      responses:
+        '200':
+          description: Успешная регистрация пользователя
+          headers:
+            Set-Cookie:
+              description: Куки для хранения токена
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '403':
+          description: Пользователь с таким логином уже зарегистрирован или ошибка в структуре запроса или пользователь с таким именем уже зарегистрирован
+        '500':
+          description: Ошибка при запись в БД
+  /update:
+    put:
+      security:
+        - cookieAuth: []
+      summary: Аутентификация и обновление информации пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                  nullable: true
+                lastName:
+                  type: string
+                  nullable: true
+                birthday:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                phoneNumber:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Данные пользователя успешно обновлены
+        '400':
+          description: Неверный или невалидный токен
+        '401':
+          description: Устаревший токен
+        '500':
+          description: Ошибка при запись в БД
+
+  /authenticate:
+    post:
+      summary: Аутентификация в систему по логину и паролю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Успешная аутентификация
+          headers:
+            Set-Cookie:
+              description: Куки для хранения токена
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Успешная аутентификация. Токен отправлен через Cookie."
+        '401':
+          description: Неверный пароль
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при запись в БД

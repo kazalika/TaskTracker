@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  auth:
+    build: 
+      context: ./auth_service
+      # dockerfile: auth_service.dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/auth_data
+
+volumes:
+  redis-data:
