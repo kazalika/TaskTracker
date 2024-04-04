@@ -69,9 +69,9 @@ var routes = Routes{
 	},
 
 	Route{
-		"UpdatePut",
+		"MyProfilePut",
 		strings.ToUpper("Put"),
-		"/update",
-		UpdatePut,
+		"/myProfile",
+		MyProfilePut,
 	},
 }

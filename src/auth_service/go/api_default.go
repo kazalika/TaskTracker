@@ -13,30 +13,29 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"mongo"
 	"net/http"
 
 	"encoding/json"
 
 	"jwt_handlers"
-	"redis"
 
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func GetUserData(username string, toSaveMap *map[string]string) (int, error) {
-	rdb := redis.GetRedisClient()
-	// Проверяем, существует ли пользователь в Redis
-	storedUserDataJSON, err := rdb.Get(context.Background(), username).Result()
+	mongoClient := mongo.GetMongoClient()
+	collection := mongoClient.Database("users_data").Collection("users")
+	var userInformation bson.M
+	filter := bson.D{{Key: "username", Value: username}}
+	err := collection.FindOne(context.Background(), filter).Decode(&userInformation)
 	if err != nil {
 		return http.StatusUnauthorized, errors.New("user not found")
 	}
+	BSONToStruct(userInformation, toSaveMap)
 
-	// Преобразуем JSON в структуру UserData
-	err = json.Unmarshal([]byte(storedUserDataJSON), &toSaveMap)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	// fmt.Println("decoded from Redis: ", storedUserData)
+	fmt.Println("decoded from BSON: ", toSaveMap)
 	return 0, nil
 }
 
@@ -54,25 +53,60 @@ func GenerateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
-func StoreUserData(username string, data map[string]string) (int, error) {
-	rdb := redis.GetRedisClient()
-	// Преобразуем данные в JSON
-	newUserDataJSON, err := json.Marshal(data)
-	if err != nil {
-		return http.StatusInternalServerError, err
+func structToBSON(data map[string]string) bson.M {
+	bsonData := bson.M{}
+	for key, value := range data {
+		bsonData[key] = value
 	}
-	// Сохраняем данные в Redis
-	err = rdb.Set(context.Background(), username, newUserDataJSON, 0).Err()
-	if err != nil {
-		return http.StatusInternalServerError, err
+	return bsonData
+}
+
+func BSONToStruct(bsonData bson.M, toSaveMap *map[string]string) {
+	data := make(map[string]string)
+	for key, value := range bsonData {
+		strKey := fmt.Sprintf("%v", key)
+		strValue := fmt.Sprintf("%v", value)
+		data[strKey] = strValue
+	}
+
+	// fmt.Println(data)
+	*toSaveMap = data
+}
+
+func StoreUserData(username string, data map[string]string) (int, error) {
+	mongoClient := mongo.GetMongoClient()
+	collection := mongoClient.Database("users_data").Collection("users")
+
+	delete(data, "_id")
+	newUserDataBSON := structToBSON(data)
+
+	if CheckIfUserExists(username) {
+		filter := bson.D{{Key: "username", Value: username}}
+		_, err := collection.ReplaceOne(context.Background(), filter, newUserDataBSON)
+		if err != nil {
+			fmt.Println("ReplaceOne failed:", err)
+			return http.StatusInternalServerError, err
+		}
+	} else {
+		_, err := collection.InsertOne(context.Background(), newUserDataBSON)
+		if err != nil {
+			return http.StatusInternalServerError, err
+		}
+
+		err = collection.FindOne(context.Background(), newUserDataBSON).Decode(&newUserDataBSON)
+		if err != nil {
+			fmt.Println("inserted user is not found ", err)
+		}
 	}
 	return 0, nil
 }
 
 func CheckIfUserExists(username string) bool {
-	rdb := redis.GetRedisClient()
-	// Проверяем, существует ли пользователь в Redis
-	_, err := rdb.Get(context.Background(), username).Result()
+	mongoClient := mongo.GetMongoClient()
+	collection := mongoClient.Database("users_data").Collection("users")
+	var userInformation bson.M
+	filter := bson.D{{Key: "username", Value: username}}
+	err := collection.FindOne(context.Background(), filter).Decode(&userInformation)
 	return err == nil
 }
 
@@ -92,7 +126,6 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Достаем данные пользователя из Redis
 	storedUserData := make(map[string]string)
 	code, err := GetUserData(creds.Username, &storedUserData)
 	if err != nil {
@@ -114,7 +147,6 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Сохраняем токен в Redis
 	storedUserData["token"] = tokenString
 
 	code, err = StoreUserData(creds.Username, storedUserData)
@@ -143,7 +175,6 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем пароль из Redis
 	if CheckIfUserExists(creds.Username) {
 		http.Error(w, "User with this Username does already exist", http.StatusBadRequest)
 		return
@@ -156,8 +187,8 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Создаем данные для нового пользователя в Redis
 	newUserData := map[string]string{
+		"username": creds.Username,
 		"password": HashPassword(creds.Password),
 		"token":    tokenString,
 	}
@@ -176,7 +207,7 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func UpdatePut(w http.ResponseWriter, r *http.Request) {
+func MyProfilePut(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	cookie, err := r.Cookie("token")
@@ -206,28 +237,25 @@ func UpdatePut(w http.ResponseWriter, r *http.Request) {
 	}
 	username := payload["username"].(string)
 
-	// Достаем данные пользователя из Redis
 	storedUserData := make(map[string]string)
 	code, err := GetUserData(username, &storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 	}
 
-	// Проверяем, что токен из Cookie совпадает с токеном из Redis
 	if v, ok := storedUserData["token"]; !ok || v != tokenString {
 		http.Error(w, "The token has expired", http.StatusUnauthorized)
 		return
 	}
 
 	// Достаем данные, которые нужно обновить
-	var creds UpdateBody
+	var creds MyProfileBody
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Обновляем данные в Redis
 	if creds.FirstName != "" {
 		storedUserData["firstName"] = creds.FirstName
 	}

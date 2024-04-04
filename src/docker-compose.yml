@@ -4,20 +4,19 @@ services:
   auth:
     build: 
       context: ./auth_service
-      # dockerfile: auth_service.dockerfile
     ports:
       - "8080:8080"
     depends_on:
-      - redis
+      - mongodb
     environment:
-      - REDIS_HOST=redis
+      - MONGO_SERVER=mongodb://user:pass@mongodb
 
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
+  mongodb:
+    image: mongodb/mongodb-community-server:6.0-ubi8
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=user
+      - MONGO_INITDB_ROOT_PASSWORD=pass
     volumes:
-      - redis-data:/auth_data
-
-volumes:
-  redis-data:
+      - type: bind
+        source: ./auth_data
+        target: /auth_data/db

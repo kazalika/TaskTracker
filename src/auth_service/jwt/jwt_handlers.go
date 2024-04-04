@@ -28,7 +28,6 @@ func NewAuthHandlers(jwtprivateFile string, jwtPublicFile string) *JWTHandlers {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Println(string(private))
 	public, err := os.ReadFile(jwtPublicFile)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

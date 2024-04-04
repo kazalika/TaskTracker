@@ -8,8 +8,7 @@
  */
 package swagger
 
-type UpdateBody struct {
-
+type MyProfileBody struct {
 	FirstName string `json:"firstName,omitempty"`
 
 	LastName string `json:"lastName,omitempty"`

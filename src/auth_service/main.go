@@ -9,13 +9,11 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
 
 	"jwt_handlers"
-	"redis"
+	"mongo"
 
 	// WARNING!
 	// Change this to a fully-qualified import path
@@ -27,33 +25,15 @@ import (
 	// sw "sw"
 )
 
-func TestRedisClient() error {
-	rdb := redis.GetRedisClient()
-	rdb.Set(context.Background(), "key", "value", 0)
-	val, err := rdb.Get(context.Background(), "key").Result()
-
-	if err != nil {
-		return err
-	}
-	if val != "value" {
-		return fmt.Errorf("wrong value in TestRedicClient %s", val)
-	}
-	return nil
-}
-
 func main() {
 	log.Printf("Server starting")
 
-	redis.InitRedisClient()
-	jwt_handlers.InitJWTHandlers()
+	// redis.InitRedisClient()
 
-	err := TestRedisClient()
-	if err != nil {
-		log.Printf("Error: %v", err)
-		return
-	} else {
-		log.Printf("TestRedisClient OK")
-	}
+	mongo.InitMongoClient()
+	defer mongo.CloseMongoClient()
+
+	jwt_handlers.InitJWTHandlers()
 
 	router := sw.NewRouter()
 
