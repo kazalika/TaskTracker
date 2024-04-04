@@ -74,7 +74,7 @@ Note: Unnecessary use of -X or --request, POST is already inferred.
 ### Update
 
 ```
-curl -v -X PUT 'localhost:8080/update' \       
+curl -v -X PUT 'localhost:8080/myProfile' \       
 --data '{"firstName": "danila", "birthday": "todayepta"}' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Im5hbWUifQ.ydrESReHn-a6l9Q2HCXRFlEgx0OA_qB_li1JofY9xCKH3ShpFNuzNDG00J9IVu9Ock3ncLRj0hRCoVHz-sO6gnDZND_xoVqXmw0Kqw1AzeIH7HtHdmFgW--xZIjioHNtp8B2N6VI93kpvz86DBCWo04AhktkiG3rUHcDYdfM-vg0iCopq3EMZh33wmuHIhBUvjqF3NF1ITrofUaJz_R8etwnqpL-diQpY98iKMEoRL9givWsndnYOLex_OKXeGySAJ8SgSDXBvqWlXGFyWOYwnCTweHT-lmsNW6PrWYm1-a83R6WTzVuy31POVMwBSYuiNMdT0Tb2KQprb70NDXv7w'
 *   Trying 127.0.0.1:8080...
