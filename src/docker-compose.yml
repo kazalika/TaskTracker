@@ -1,0 +1,22 @@
+version: '3.7'
+
+services:
+  auth:
+    build: 
+      context: ./auth_service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_SERVER=mongodb://user:pass@mongodb
+
+  mongodb:
+    image: mongodb/mongodb-community-server:6.0-ubi8
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=user
+      - MONGO_INITDB_ROOT_PASSWORD=pass
+    volumes:
+      - type: bind
+        source: ./auth_data
+        target: /auth_data/db
