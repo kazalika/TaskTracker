@@ -121,3 +121,143 @@ paths:
           description: Ошибка в структуре запроса
         '500':
           description: Ошибка при запись в БД
+
+  /tasks/create:
+    post:
+      security:
+        - cookieAuth: []
+      summary: Создание задачи в task_service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+              required:
+                - title
+                - description
+                - status
+      responses:
+        '200':
+          description: Успешное создание задачи
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                required:
+                  - task_id
+                    
+        '401':
+          description: Пользователь не авторизован
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при записи или чтении в или из БД
+  
+  /tasks/update/{task_id}:
+    put:
+      security:
+        - cookieAuth: []
+      summary: Изменение задачи в task_service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+              required:
+                - title
+                - description
+                - status
+      responses:
+        '200':
+          description: Успешное изменение задачи
+        '401':
+          description: Пользователь не авторизован или задача принадлежит другому пользователю
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при записи или чтении в или из БД
+  /tasks/delete/{task_id}:
+    delete:
+      security:
+        - cookieAuth: []
+      summary: Удаление задачи из task_service
+      responses:
+        '200':
+          description: Успешное удаление задачи
+        '401':
+          description: Пользователь не авторизован или задача принадлежит другому пользователю
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при записи или чтении в или из БД
+  
+  /task/get/{task_id}:
+    get:
+      security:
+        - cookieAuth: []
+      summary: Получение задачи из task_service по её ID
+      responses:
+        '200':
+          description: Успешная получение задачи
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  status:
+                    type: string
+        '401':
+          description: Пользователь не авторизован или задача принадлежит другому пользователю
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при записи или чтении в или из БД
+  /task/getPage:
+    get:
+      security:
+        - cookieAuth: []
+      summary: Получение списка задач из task_service по её offset и page_size
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                offset:
+                  type: int32
+                page_size:
+                  type: int32
+      responses:
+        '200':
+          description: Успешная получение списка задач
+        '401':
+          description: Пользователь не авторизован или задача принадлежит другому пользователю
+        '403':
+          description: Ошибка в структуре запроса
+        '500':
+          description: Ошибка при записи или чтении в или из БД
+      
