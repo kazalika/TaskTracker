@@ -4,6 +4,8 @@ services:
   auth:
     build: 
       context: ./auth_service
+    volumes:
+    - ./task_service:/task_service
     ports:
       - "8080:8080"
     depends_on:
@@ -20,3 +22,23 @@ services:
       - type: bind
         source: ./auth_data
         target: /auth_data/db
+
+  task_service:
+    build:
+     context: ./task_service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgresql
+      - auth
+  
+  postgresql:
+    image: postgres:latest
+    ports:
+     - "5432:5432"
+    environment:
+      - POSTGRES_DB=task_service_db
+      - POSTGRES_USER=main_user
+      - POSTGRES_PASSWORD=very_strong_generated_password
+    volumes:
+      - ./task_service/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
