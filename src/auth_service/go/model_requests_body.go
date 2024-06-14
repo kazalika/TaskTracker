@@ -16,3 +16,11 @@ type UpdateTaskBody struct {
 	Description string `json:"description"`
 	Status      string `json:"status"`
 }
+
+type LikeRequest struct {
+	TaskID string `json:"post_id"`
+}
+
+type ViewRequest struct {
+	TaskID string `json:"post_id"`
+}

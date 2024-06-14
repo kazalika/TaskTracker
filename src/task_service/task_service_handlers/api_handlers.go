@@ -90,14 +90,15 @@ func (s *Server) DeleteTask(ctx context.Context, request *task_servicepb.Request
 
 	return &task_servicepb.TaskID{Id: request.Id.Id}, nil
 }
+
 func (s *Server) GetTaskById(ctx context.Context, request *task_servicepb.RequestByID) (*task_servicepb.Task, error) {
-	var title, description, taskStatus string
-	err := s.db.QueryRowContext(ctx, "SELECT title, description, status FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.RequestorUsername, request.Id.Id).Scan(&title, &description, &taskStatus)
+	var title, description, taskStatus, creator string
+	err := s.db.QueryRowContext(ctx, "SELECT title, description, status, creator_username FROM task_service_db WHERE task_id = $1", request.Id.Id).Scan(&title, &description, &taskStatus, &creator)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return &task_servicepb.Task{}, status.Errorf(codes.NotFound, "there is no task with ID=%s by user=%s", request.Id.Id, request.RequestorUsername)
+			return &task_servicepb.Task{}, status.Errorf(codes.NotFound, "there is no task with ID=%s", request.Id.Id)
 		} else {
-			return &task_servicepb.Task{}, status.Errorf(codes.Internal, "failed to get task with ID=%s from user=%s", request.Id.Id, request.RequestorUsername)
+			return &task_servicepb.Task{}, status.Errorf(codes.Internal, "failed to get task with ID=%s", request.Id.Id)
 		}
 	}
 
@@ -107,14 +108,15 @@ func (s *Server) GetTaskById(ctx context.Context, request *task_servicepb.Reques
 			Title:           title,
 			Description:     description,
 			Status:          taskStatus,
-			CreatorUsername: request.RequestorUsername,
+			CreatorUsername: creator,
 		},
 	}, nil
 }
+
 func (s *Server) GetTaskList(ctx context.Context, request *task_servicepb.TaskPageRequest) (*task_servicepb.TaskList, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT task_id, title, description, status FROM task_service_db WHERE creator_username = $1 ORDER BY task_id LIMIT $2 OFFSET $3", request.RequestorUsername, request.PageSize, request.Offset)
+	rows, err := s.db.QueryContext(ctx, "SELECT task_id, title, description, status, creator_username FROM task_service_db ORDER BY task_id LIMIT $1 OFFSET $2", request.PageSize, request.Offset)
 	if err != nil {
-		return &task_servicepb.TaskList{}, status.Errorf(codes.Internal, "failed to get task with from user=%s with offset=%v, page_size=%v", request.RequestorUsername, request.Offset, request.PageSize)
+		return &task_servicepb.TaskList{}, status.Errorf(codes.Internal, "failed to get task with offset=%v, page_size=%v", request.Offset, request.PageSize)
 	}
 	defer rows.Close()
 
@@ -126,7 +128,7 @@ func (s *Server) GetTaskList(ctx context.Context, request *task_servicepb.TaskPa
 			Id:   &task_servicepb.TaskID{},
 			Task: &task_servicepb.TaskContent{},
 		}
-		err = rows.Scan(&task.Id.Id, &task.Task.Title, &task.Task.Description, &task.Task.Status)
+		err = rows.Scan(&task.Id.Id, &task.Task.Title, &task.Task.Description, &task.Task.Status, &task.Task.CreatorUsername)
 
 		if err != nil {
 			return &task_servicepb.TaskList{}, status.Errorf(codes.Internal, "failed to read field in a row")

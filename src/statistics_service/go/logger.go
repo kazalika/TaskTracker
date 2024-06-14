@@ -1,4 +1,4 @@
-package auth_service
+package statistics_service
 
 import (
 	"log"

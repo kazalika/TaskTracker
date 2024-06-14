@@ -31,7 +31,6 @@ message RequestByID {
 }
 
 message TaskPageRequest {
-    string requestor_username = 1;
     int32 offset = 2;
     int32 pageSize = 3;
 }

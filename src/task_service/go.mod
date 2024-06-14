@@ -3,7 +3,6 @@ module task_service
 go 1.22.0
 
 require (
-	github.com/google/uuid v1.6.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.32.0
 	postgres v0.0.0

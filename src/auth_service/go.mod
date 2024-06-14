@@ -4,6 +4,7 @@ go 1.22.0
 
 require (
 	jwt_handlers v0.0.0
+	kafka_handlers v0.0.0
 	mongo v0.0.0
 	task_service v0.0.0
 )
@@ -13,6 +14,12 @@ require (
 	github.com/gorilla/mux v1.8.1
 	go.mongodb.org/mongo-driver v1.14.0
 	google.golang.org/grpc v1.63.0
+)
+
+require (
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
+	github.com/segmentio/kafka-go v0.4.47 // indirect
 )
 
 require (
@@ -39,3 +46,4 @@ replace task_service => ../task_service
 
 replace jwt_handlers => ./jwt
 
+replace kafka_handlers => ./kafka
