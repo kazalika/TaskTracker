@@ -13,6 +13,7 @@ services:
     environment:
       - MONGO_SERVER=mongodb://user:pass@mongodb
       - KAFKA_URL=kafka:9092
+      - TASK_SERVICE_URL=dns:///task_service:8081
 
   mongodb:
     image: mongodb/mongodb-community-server:6.0-ubi8

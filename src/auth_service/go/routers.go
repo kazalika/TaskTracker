@@ -3,7 +3,6 @@ package auth_service
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -48,99 +47,92 @@ var routes = Routes{
 
 	Route{
 		"AuthenticatePost",
-		strings.ToUpper("Post"),
+		"POST",
 		"/authenticate",
-		AuthenticatePost,
+		Authenticate,
 	},
 
 	Route{
 		"RegisterPost",
-		strings.ToUpper("Post"),
+		"POST",
 		"/register",
-		RegisterPost,
+		Register,
 	},
 
 	Route{
-		"MyProfilePut",
-		strings.ToUpper("Put"),
-		"/myProfile",
-		MyProfilePut,
+		"UpdateMyProfile",
+		"PUT",
+		"/profile",
+		UpdateMyProfile,
 	},
 
 	Route{
-		"CreateTaskPost",
-		strings.ToUpper("Post"),
+		"CreateTask",
+		"POST",
 		"/tasks/create",
-		CreateTaskPost,
+		CreateTask,
 	},
 
 	Route{
-		"UpdateTaskPut",
-		strings.ToUpper("Put"),
-		"/tasks/update/{task_id}",
-		UpdateTaskPut,
+		"UpdateTask",
+		"PUT",
+		"/tasks/{task_id}",
+		UpdateTask,
 	},
 
 	Route{
 		"DeleteTaskPost",
-		strings.ToUpper("Delete"),
-		"/tasks/delete/{task_id}",
-		DeleteTaskDelete,
+		"DELETE",
+		"/tasks/{task_id}",
+		DeleteTask,
 	},
 
 	Route{
-		"GetTaskGet",
-		strings.ToUpper("Get"),
-		"/tasks/get/{task_id}",
-		GetTaskGet,
+		"GetTask",
+		"GET",
+		"/tasks/{task_id}",
+		GetTask,
 	},
 
 	Route{
-		"GetTaskPageGet",
-		strings.ToUpper("Get"),
-		"/tasks/getPage",
-		GetTaskPageGet,
+		"GetTaskPage",
+		"GET",
+		"/tasks/page",
+		GetTaskPage,
 	},
 
 	Route{
-		"ViewTaskPost",
-		strings.ToUpper("Post"),
+		"View",
+		"POST",
 		"/tasks/{task_id}/view",
-		ViewTaskPost,
+		View,
 	},
 
 	Route{
 		"LikeTaskPost",
-		strings.ToUpper("Post"),
+		"POST",
 		"/tasks/{task_id}/like",
 		LikeTaskPost,
 	},
 
 	Route{
 		"GetTaskStats",
-		strings.ToUpper("Get"),
+		"GET",
 		"/tasks/{task_id}/stats",
 		GetTaskStats,
 	},
 
 	Route{
 		"GetTopTasksGet",
-		strings.ToUpper("Get"),
+		"GET",
 		"/top/tasks/{parameter}",
-		GetTopTasksGet,
+		GetTopTasks,
 	},
 
 	Route{
 		"GetTopUsers",
-		strings.ToUpper("Get"),
+		"GET",
 		"/top/users",
-		GetTopUsersGet,
-	},
-
-	Route{
-		"AlwaysOKGet",
-		strings.ToUpper("Get"),
-		"/ok",
-		AlwaysOKGet,
+		GetTopUsers,
 	},
 }

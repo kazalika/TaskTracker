@@ -2,23 +2,16 @@ package auth_service
 
 import (
 	"context"
-	"crypto/md5"
-	"errors"
 	"fmt"
-	"io"
 	"kafka_handlers"
 	"log"
-	"mongo"
 	"net/http"
+	"os"
 
 	"encoding/json"
 
-	"jwt_handlers"
-
 	"github.com/gogo/protobuf/jsonpb"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,152 +21,35 @@ import (
 )
 
 var (
-	grpc_conn   *grpc.ClientConn
-	grpc_client task_servicepb.TaskServiceClient
+	taskServiceGRPCConnection *grpc.ClientConn
+	taskServiceClient         task_servicepb.TaskServiceClient
 )
 
 func init() {
 	var err error
-	grpc_conn, err = grpc.NewClient("dns:///task_service:8081", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	taskServiceURL, ok := os.LookupEnv("TASK_SERVICE_URL")
+	if !ok {
+		log.Fatal("No TASK_SERVICE_URL setted but should")
+	}
+	taskServiceGRPCConnection, err = grpc.NewClient(taskServiceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	grpc_client = task_servicepb.NewTaskServiceClient(grpc_conn)
+	taskServiceClient = task_servicepb.NewTaskServiceClient(taskServiceGRPCConnection)
 }
 
-func GetUserData(username string, toSaveMap *map[string]string) (int, error) {
-	mongoClient := mongo.GetMongoClient()
-	collection := mongoClient.Database("users_data").Collection("users")
-	var userInformation bson.M
-	filter := bson.D{{Key: "username", Value: username}}
-	err := collection.FindOne(context.Background(), filter).Decode(&userInformation)
-	if err != nil {
-		return http.StatusUnauthorized, errors.New("user not found")
-	}
-	BSONToStruct(userInformation, toSaveMap)
-
-	fmt.Println("decoded from BSON: ", toSaveMap)
-	return 0, nil
-}
-
-func GenerateJWT(username string) (string, error) {
-	han := jwt_handlers.GetJWTHandlers()
-	payload := jwt.MapClaims{
-		"username": username,
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, payload)
-	tokenString, err := token.SignedString(han.JwtPrivate)
-	if err != nil {
-		fmt.Println("Error signing token:", err)
-		return "", err
-	}
-	return tokenString, nil
-}
-
-func CheckIfUserAuthenticated(r *http.Request, username *string, storedUserData *map[string]string) (int, error) {
-	cookie, err := r.Cookie("token")
-	if err != nil {
-		return http.StatusUnauthorized, err
-	}
-	// Получаем доступ к ключам JWT
-	han := jwt_handlers.GetJWTHandlers()
-
-	// Получаем токен из Cookie
-	tokenString := cookie.Value
-	payload := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, &payload, func(token *jwt.Token) (interface{}, error) {
-		return han.JwtPublic, nil
-	})
-
-	// Проверяем валидность токена
-	if err != nil || !token.Valid {
-		return http.StatusBadRequest, errors.New("invalid jwt token")
-	}
-	// Проверяем, что в токене есть поле username
-	if _, ok := payload["username"]; !ok {
-		return http.StatusBadRequest, errors.New("invalid payload in jwt token")
-	}
-	*username = payload["username"].(string)
-
-	code, err := GetUserData(*username, storedUserData)
-	if err != nil {
-		return code, err
-	}
-
-	if v, ok := (*storedUserData)["token"]; !ok || v != tokenString {
-		return http.StatusUnauthorized, errors.New("the token has expired")
-	}
-
-	return 200, nil
-}
-
-func structToBSON(data map[string]string) bson.M {
-	bsonData := bson.M{}
-	for key, value := range data {
-		bsonData[key] = value
-	}
-	return bsonData
-}
-
-func BSONToStruct(bsonData bson.M, toSaveMap *map[string]string) {
-	data := make(map[string]string)
-	for key, value := range bsonData {
-		strKey := fmt.Sprintf("%v", key)
-		strValue := fmt.Sprintf("%v", value)
-		data[strKey] = strValue
-	}
-
-	// fmt.Println(data)
-	*toSaveMap = data
-}
-
-func StoreUserData(username string, data map[string]string) (int, error) {
-	mongoClient := mongo.GetMongoClient()
-	collection := mongoClient.Database("users_data").Collection("users")
-
-	delete(data, "_id")
-	newUserDataBSON := structToBSON(data)
-
-	if CheckIfUserExists(username) {
-		filter := bson.D{{Key: "username", Value: username}}
-		_, err := collection.ReplaceOne(context.Background(), filter, newUserDataBSON)
-		if err != nil {
-			fmt.Println("ReplaceOne failed:", err)
-			return http.StatusInternalServerError, err
-		}
-	} else {
-		_, err := collection.InsertOne(context.Background(), newUserDataBSON)
-		if err != nil {
-			return http.StatusInternalServerError, err
-		}
-
-		err = collection.FindOne(context.Background(), newUserDataBSON).Decode(&newUserDataBSON)
-		if err != nil {
-			fmt.Println("inserted user is not found ", err)
-		}
-	}
-	return 0, nil
-}
-
-func CheckIfUserExists(username string) bool {
-	mongoClient := mongo.GetMongoClient()
-	collection := mongoClient.Database("users_data").Collection("users")
-	var userInformation bson.M
-	filter := bson.D{{Key: "username", Value: username}}
-	err := collection.FindOne(context.Background(), filter).Decode(&userInformation)
-	return err == nil
-}
-
-func HashPassword(password string) string {
-	hash := md5.Sum([]byte(password + "SALT"))
-	return fmt.Sprintf("%x", hash)
-}
-
-func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
+// Authentication handler
+//
+//	Method: POST
+//
+//	If password is incorrect returns 401 (Status Unauthorized)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+//	If request body is not correct returns 400 (Status Bad Request)
+func Authenticate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Декодируем JSON из RequestBody в структуру Credentials
+	// Request data decoding
 	var creds AuthenticateBody
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
@@ -188,15 +64,13 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, совпадают ли пароли и есть ли в структуре вообще
 	storedPassword, ok := storedUserData["password"]
 	if !ok || storedPassword != HashPassword(creds.Password) {
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
 
-	// Генерируем токен
-	tokenString, err := GenerateJWT(creds.Username)
+	tokenString, err := GenerateJWTToken(creds.Username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,7 +83,6 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 	}
 
-	// Устанавливаем токен в Cookie
 	cookie := http.Cookie{
 		Name:  "token",
 		Value: tokenString,
@@ -219,10 +92,18 @@ func AuthenticatePost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func RegisterPost(w http.ResponseWriter, r *http.Request) {
+// Registration handler
+//
+//		Method: POST
+//
+//		If password is incorrect returns 401 (Status Unauthorized)
+//		If internal error occurred returns 500 (Status Internal Server Error)
+//		If request body is not correct returns 400 (Status Bad Request)
+//	 	If user with this username already exists returns 400 (Status Bad Request)
+func Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Декодируем JSON из RequestBody в структуру Credentials
+	// Request data decoding
 	var creds RegisterBody
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
@@ -235,13 +116,14 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Генерируем токен
-	tokenString, err := GenerateJWT(creds.Username)
+	// Generating JWT token
+	tokenString, err := GenerateJWTToken(creds.Username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Store new user's data to storage
 	newUserData := map[string]string{
 		"username": creds.Username,
 		"password": HashPassword(creds.Password),
@@ -252,7 +134,7 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 	}
 
-	// Устанавливаем токен в Cookie
+	// Make Cookie
 	cookie := http.Cookie{
 		Name:  "token",
 		Value: tokenString,
@@ -262,26 +144,34 @@ func RegisterPost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func MyProfilePut(w http.ResponseWriter, r *http.Request) {
+// UpdateMyProfile handler
+//
+//	Method: PUT
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his information
 	var username string
 	storedUserData := make(map[string]string)
-
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
 	}
 
-	// Достаем данные, которые нужно обновить
-	var creds MyProfileBody
+	// Decoding RequestBody
+	var creds ProfileInfo
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// Updating by new information
 	if creds.FirstName != "" {
 		storedUserData["firstName"] = creds.FirstName
 	}
@@ -298,6 +188,7 @@ func MyProfilePut(w http.ResponseWriter, r *http.Request) {
 		storedUserData["phone"] = creds.PhoneNumber
 	}
 
+	// Store updated info into Mongo
 	code, err = StoreUserData(username, storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
@@ -306,9 +197,18 @@ func MyProfilePut(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func CreateTaskPost(w http.ResponseWriter, r *http.Request) {
+// CreateTask handler
+//
+//	Method: POST
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func CreateTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -317,6 +217,7 @@ func CreateTaskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decoding request body
 	var creds CreateTaskBody
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
@@ -324,39 +225,51 @@ func CreateTaskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	grpc_resp, err := grpc_client.CreateTask(context.Background(), &task_servicepb.TaskContent{
+	// Send request to Task Service by GRPC
+	IDHolder, err := taskServiceClient.CreateTask(context.Background(), &task_servicepb.TaskContent{
 		Title:           creds.Title,
 		Description:     creds.Description,
 		Status:          creds.Status,
 		CreatorUsername: username,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintln(w, "Some internal error (with postgres, for example)")
+		err = fmt.Errorf("grpc `CreateTask` request failed with error: %w", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = kafka_handlers.CreateEmptyStatistics(grpc_resp.Id, username)
+	// Send message to Kafka that new task was created so we need to create empty statistics ({likes: 0, views: 0})
+	err = kafka_handlers.CreateEmptyStatistics(IDHolder.Id, username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	http_resp := TaskID{TaskID: grpc_resp.Id}
-
+	// Write answer into http response
+	http_resp := TaskID{TaskID: IDHolder.Id}
 	http_resp_bytes, err := json.Marshal(http_resp)
 	if err != nil {
+		err = fmt.Errorf("json marshaler failed to marshal new task's id but task was already created with id %v. Error message: %w", IDHolder.Id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	w.Write(http_resp_bytes)
 	w.WriteHeader(http.StatusOK)
 }
 
-func UpdateTaskPut(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+// CreateTask handler
+//
+//	Method: PUT
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If task with this ID doesn't exist or requestor is not an author of the task returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func UpdateTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -365,16 +278,21 @@ func UpdateTaskPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decoding request body
 	var creds UpdateTaskBody
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
 
 	var task task_servicepb.Task
-	task.Id = &task_servicepb.TaskID{Id: task_id}
+	task.Id = &task_servicepb.TaskID{
+		Id: task_id,
+	}
 	task.Task = &task_servicepb.TaskContent{
 		Title:           creds.Title,
 		Description:     creds.Description,
@@ -382,23 +300,37 @@ func UpdateTaskPut(w http.ResponseWriter, r *http.Request) {
 		CreatorUsername: username,
 	}
 
-	_, err = grpc_client.UpdateTask(context.Background(), &task)
+	// Send request to Task Service by GRPC
+	// If requestor is not author of task then request returns error `NotFound`
+	_, err = taskServiceClient.UpdateTask(context.Background(), &task)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			err = fmt.Errorf("grpc request `UpdateTask` failed because task with id=%v doesn't exists or requestor is not an author. Error message: %w", task.Id.Id, err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
+			err = fmt.Errorf("grpc request `UpdateTask` failed with error message: %w", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	w.Write([]byte("Task has been updated succesfully"))
+	w.Write([]byte("Task has been updated succesfully\n"))
 	w.WriteHeader(http.StatusOK)
 }
 
-func DeleteTaskDelete(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+// DeleteTask handler
+//
+//	Method: DELETE
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If task with this ID doesn't exist or requestor is not an author of the task returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func DeleteTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -406,17 +338,24 @@ func DeleteTaskDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 		return
 	}
+
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
+
 	taskID := &task_servicepb.TaskID{Id: task_id}
 
-	_, err = grpc_client.DeleteTask(context.Background(), &task_servicepb.RequestByID{
+	// Send request to Task Service by GRPC
+	// If requestor is not author of task then request returns error `NotFound`
+	_, err = taskServiceClient.DeleteTask(context.Background(), &task_servicepb.RequestByID{
 		Id:                taskID,
 		RequestorUsername: username,
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			err = fmt.Errorf("requestor is not an author of the task. GRPC's error message: %w", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
+			err = fmt.Errorf("grpc request `DeleteTask` failed with error message: %w", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -426,9 +365,18 @@ func DeleteTaskDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func GetTaskGet(w http.ResponseWriter, r *http.Request) {
+// GetTask handler
+//
+//	Method: GET
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func GetTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -437,19 +385,24 @@ func GetTaskGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
+
 	taskID := task_servicepb.TaskID{
 		Id: task_id,
 	}
 
-	grpc_resp, err := grpc_client.GetTaskById(context.Background(), &task_servicepb.RequestByID{
+	// Send request to Task Service by GRPC
+	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
 		Id:                &taskID,
 		RequestorUsername: username,
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
+			err = fmt.Errorf("task with this id doesn't exist: %w", err)
 			http.Error(w, err.Error(), http.StatusNotFound)
 		} else {
+			err = fmt.Errorf("grpc request `GetTaskById` failed with error message: %w", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -463,6 +416,7 @@ func GetTaskGet(w http.ResponseWriter, r *http.Request) {
 
 	http_resp_bytes, err := json.Marshal(http_resp)
 	if err != nil {
+		err = fmt.Errorf("json marshaler error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -471,9 +425,18 @@ func GetTaskGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func GetTaskPageGet(w http.ResponseWriter, r *http.Request) {
+// GetTaskPage handler
+//
+//	Method: GET
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If request body is not correct returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func GetTaskPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -481,6 +444,8 @@ func GetTaskPageGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 		return
 	}
+
+	// Decoding request body
 	var creds TaskListRequest
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
@@ -488,22 +453,22 @@ func GetTaskPageGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	grpc_resp, err := grpc_client.GetTaskList(context.Background(), &task_servicepb.TaskPageRequest{
+	// Send requset to Task Service by GRPC
+	grpc_resp, err := taskServiceClient.GetTaskList(context.Background(), &task_servicepb.TaskPageRequest{
 		Offset:   creds.Offset,
 		PageSize: creds.PageSize,
 	})
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		err = fmt.Errorf("grpc `GetTaskList` failed with message: %w", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Marshal Protobuf to JSON
 	marshaler := jsonpb.Marshaler{}
 	jsonStr, err := marshaler.MarshalToString(grpc_resp)
-
 	if err != nil {
+		err = fmt.Errorf("protobuf to json marshaler failed with message: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -512,12 +477,17 @@ func GetTaskPageGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-/*
- * Send a message about a view into the broker (Kafka)
- */
-func ViewTaskPost(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+// View handler
+//
+//	Method: POST
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func View(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -526,35 +496,49 @@ func ViewTaskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
 
-	grpc_resp, err := grpc_client.GetTaskById(context.Background(), &task_servicepb.RequestByID{
+	// Send requset to Task Service by GRPC to get task's author name
+	// If task doesn't exists returns error `NotFound`
+	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
 		Id:                &task_servicepb.TaskID{Id: task_id},
-		RequestorUsername: username,
+		RequestorUsername: username, // ?? not neccessary, maybe remove?
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			err = fmt.Errorf("task with this id doesn't exist: %w", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
+			err = fmt.Errorf("grpc `GetTaskById` failed with message: %w", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
+	// Send view to Kafka
 	err = kafka_handlers.View(username, task_id, grpc_resp.Task.CreatorUsername)
 	if err != nil {
+		err = fmt.Errorf("`view` message sending caused a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.Write([]byte("Task has been viewed succesfully\n"))
 	w.WriteHeader(http.StatusOK)
 }
 
-/*
- * Send a message about a like into the broker (Kafka)
- */
+// Like handler
+//
+//	Method: POST
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
 func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -563,46 +547,49 @@ func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
 
-	grpc_resp, err := grpc_client.GetTaskById(context.Background(), &task_servicepb.RequestByID{
+	// Send requset to Task Service by GRPC to get task's author name
+	// If task doesn't exists returns error `NotFound`
+	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
 		Id:                &task_servicepb.TaskID{Id: task_id},
-		RequestorUsername: username,
+		RequestorUsername: username, // ?? not neccessary, maybe remove?
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			err = fmt.Errorf("task with this id doesn't exist: %w", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
+			err = fmt.Errorf("grpc `GetTaskById` failed with message: %w", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
+	// Send like to Kafka
 	err = kafka_handlers.Like(username, task_id, grpc_resp.Task.CreatorUsername)
 	if err != nil {
+		err = fmt.Errorf("`like` message sending caused a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.Write([]byte("Task has been liked succesfully\n"))
 	w.WriteHeader(http.StatusOK)
 }
 
-/*
- *  Always returns 200 OK
- */
-func AlwaysOKGet(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-func pipeReq(rw http.ResponseWriter, resp *http.Response) {
-	rw.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-	rw.Header().Set("Content-Length", resp.Header.Get("Content-Length"))
-	io.Copy(rw, resp.Body)
-	resp.Body.Close()
-}
-
+// GetTaskStats handler
+//
+//	Method: GET
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
 func GetTaskStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -611,20 +598,32 @@ func GetTaskStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get variable from URL
 	task_id := mux.Vars(r)["task_id"]
 
+	// Get statistics for task from Statistics Service
 	resp, err := http.Get("http://statistics_service:8090/tasks/" + task_id + "/stats")
 	if err != nil {
+		err = fmt.Errorf("statistics service cause a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	pipeReq(w, resp)
+	// Copy response to ResponseWriter
+	CopyResponseToWriter(w, resp)
 }
 
-func GetTopTasksGet(w http.ResponseWriter, r *http.Request) {
+// GetTopTasks handler
+//
+//	Method: GET
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func GetTopTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -633,20 +632,32 @@ func GetTopTasksGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get variable from URL
 	parameter := mux.Vars(r)["parameter"]
 
+	// Get top of tasks by parameter from Statistics Service
 	resp, err := http.Get("http://statistics_service:8090/top/tasks/" + parameter)
 	if err != nil {
+		err = fmt.Errorf("statistics service cause a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	pipeReq(w, resp)
+	// Copy response to ResponseWriter
+	CopyResponseToWriter(w, resp)
 }
 
-func GetTopUsersGet(w http.ResponseWriter, r *http.Request) {
+// GetTopUsers handler
+//
+//	Method: GET
+//
+//	If user is not authenticated returns 400 (Status Bad Request)
+//	If internal error occurred returns 500 (Status Internal Server Error)
+func GetTopUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
+	// Check if user is authenticated and get his info
+	// ?? can we don't load his info? it's unused variable actually
 	var username string
 	storedUserData := make(map[string]string)
 	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
@@ -655,20 +666,14 @@ func GetTopUsersGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get top of users by likes from Statistics Service
 	resp, err := http.Get("http://statistics_service:8090/top/users")
 	if err != nil {
+		err = fmt.Errorf("statistics service cause a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(body)
-	w.WriteHeader(resp.StatusCode)
+	// Copy response to ResponseWriter
+	CopyResponseToWriter(w, resp)
 }
