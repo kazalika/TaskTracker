@@ -29,5 +29,6 @@ func main() {
 	defer kafka_handlers.CloseKafkaTopics()
 
 	router := main_logic.NewRouter()
+	log.Println("[Ready] Listen on :8080. You can send requests to main service")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

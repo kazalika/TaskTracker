@@ -77,6 +77,7 @@ services:
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_PORT: 9000
+      #   This parameters are set in `/statistics_service/init.sql` file
       # KAFKA_BROKERS: kafka:9092
       # KAFKA_TOPIC_VIEW: views
       # KAFKA_TOPIC_LIKES: likes
@@ -87,9 +88,13 @@ services:
       - zookeeper
     ports:
       - "9000:9000"
-      - "8123:8123"
 
   statistics_service:
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_ADDRESS: clickhouse:9000
     build:
      context: ./statistics_service
     ports:

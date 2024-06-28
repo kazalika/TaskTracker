@@ -26,4 +26,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace clickhouse_handlers => ./clickhouse
+replace clickhouse_handlers => ./clickhouse_handlers

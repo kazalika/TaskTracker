@@ -54,12 +54,12 @@ var routes = Routes{
 		"GetTopTasks",
 		"GET",
 		"/top/tasks/{parameter}",
-		GetTop5Tasks,
+		GetTopTasks,
 	},
 	Route{
 		"GetTopUsers",
 		"GET",
 		"/top/users",
-		GetTop3Users,
+		GetTopUsers,
 	},
 }
