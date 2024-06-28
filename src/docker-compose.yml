@@ -12,6 +12,8 @@ services:
       - mongodb
     environment:
       - MONGO_SERVER=mongodb://user:pass@mongodb
+      - KAFKA_URL=kafka:9092
+      - TASK_SERVICE_URL=dns:///task_service:8081
 
   mongodb:
     image: mongodb/mongodb-community-server:6.0-ubi8
@@ -31,6 +33,7 @@ services:
     depends_on:
       - postgresql
       - auth
+      - statistics_service
   
   postgresql:
     image: postgres:latest
@@ -42,3 +45,60 @@ services:
       - POSTGRES_PASSWORD=very_strong_generated_password
     volumes:
       - ./task_service/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+  
+  kafka:
+    image: bitnami/kafka:latest
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9092,OUTSIDE://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:9092,OUTSIDE://0.0.0.0:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: org.apache.kafka=INFO,org.apache.zookeeper=INFO
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.4
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  clickhouse:
+    image: yandex/clickhouse-server
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_PORT: 9000
+      #   This parameters are set in `/statistics_service/init.sql` file
+      # KAFKA_BROKERS: kafka:9092
+      # KAFKA_TOPIC_VIEW: views
+      # KAFKA_TOPIC_LIKES: likes
+    volumes:
+      - ./statistics_service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - "9000:9000"
+
+  statistics_service:
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_ADDRESS: clickhouse:9000
+    build:
+     context: ./statistics_service
+    ports:
+      - "8090:8090"
+    depends_on:
+      - kafka
+      - clickhouse

@@ -1,6 +1,6 @@
-module mongo
+module mongo_handlers
 
-go 1.18
+go 1.22.0
 
 require go.mongodb.org/mongo-driver v1.11.2
 
