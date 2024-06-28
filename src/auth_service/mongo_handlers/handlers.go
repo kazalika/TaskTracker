@@ -59,9 +59,6 @@ func GetUserToken(username string) (token string, err error) {
 	collection := mongoClient.Database("users_data").Collection("tokens")
 	var tokenStruct bson.M
 	filter := bson.D{{Key: "username", Value: username}}
-
-	log.Printf("`GetUserToken` username: %s", username)
-
 	err = collection.FindOne(context.Background(), filter).Decode(&tokenStruct)
 	if err != nil {
 		err = fmt.Errorf("get user's token from mongo failed with message: %w", err)
@@ -70,9 +67,7 @@ func GetUserToken(username string) (token string, err error) {
 	mapToConvert := make(map[string]string)
 	ConvertBSONToStruct(tokenStruct, &mapToConvert)
 
-	log.Printf("`GetUserToken` got token: %s", mapToConvert["token"])
-
-	return mapToConvert["token"], nil // ?? is it ok?
+	return mapToConvert["token"], nil
 }
 
 func StoreUserToken(username string, token string) (code int, err error) {
@@ -83,8 +78,6 @@ func StoreUserToken(username string, token string) (code int, err error) {
 		"token":    token,
 	})
 
-	log.Printf("`StoreUserToken` username: %s, token: %s", username, token)
-
 	if CheckIfUserExists(username) {
 		// Replace old token by new one
 		filter := bson.D{{Key: "username", Value: username}}
@@ -94,8 +87,6 @@ func StoreUserToken(username string, token string) (code int, err error) {
 			return http.StatusInternalServerError, err
 		}
 	} else {
-		log.Println("`StoreUserToken` Insert One branch")
-
 		// Insert new user's token
 		_, err := collection.InsertOne(context.Background(), tokenBSON)
 		if err != nil {
@@ -105,10 +96,10 @@ func StoreUserToken(username string, token string) (code int, err error) {
 
 		// Check if insert is done correctly
 		// !! Comment when not debugging
-		err = collection.FindOne(context.Background(), tokenBSON).Decode(&tokenBSON)
-		if err != nil {
-			log.Fatal("function `StoreUserToken`: inserted user is not found ", err)
-		}
+		// err = collection.FindOne(context.Background(), tokenBSON).Decode(&tokenBSON)
+		// if err != nil {
+		// 	log.Fatal("function `StoreUserToken`: inserted user is not found ", err)
+		// }
 	}
 
 	return http.StatusOK, nil
@@ -140,10 +131,10 @@ func StoreUserData(username string, data map[string]string) (code int, err error
 
 		// Check if insert is done correctly
 		// !! Comment when not debugging
-		err = collection.FindOne(context.Background(), newUserDataBSON).Decode(&newUserDataBSON)
-		if err != nil {
-			log.Fatal("function `StoreUserData`: inserted user is not found ", err)
-		}
+		// err = collection.FindOne(context.Background(), newUserDataBSON).Decode(&newUserDataBSON)
+		// if err != nil {
+		// 	log.Fatal("function `StoreUserData`: inserted user is not found ", err)
+		// }
 	}
 	return http.StatusOK, nil
 }
