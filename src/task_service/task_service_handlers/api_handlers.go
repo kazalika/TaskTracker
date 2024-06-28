@@ -3,7 +3,6 @@ package task_service
 import (
 	"context"
 	"database/sql"
-	"strconv"
 	"sync/atomic"
 
 	postgres "postgres"
@@ -26,15 +25,15 @@ func NewServer() (server *Server, err error) {
 	return
 }
 
-func GenerateUUID(s *Server) string {
-	return strconv.Itoa(int(s.taskCounter.Add(1)))
+func GenerateTaskID(s *Server) int32 {
+	return int32(s.taskCounter.Add(1))
 }
 
 func (s *Server) CreateTask(ctx context.Context, request *task_servicepb.TaskContent) (*task_servicepb.TaskID, error) {
-	taskID := GenerateUUID(s)
+	taskID := GenerateTaskID(s)
 	_, err := s.db.ExecContext(ctx, "INSERT INTO task_service_db (creator_username, task_id, title, description, status) VALUES ($1, $2, $3, $4, $5)", request.CreatorUsername, taskID, request.Title, request.Description, request.Status)
 	if err != nil {
-		return &task_servicepb.TaskID{Id: taskID}, status.Errorf(codes.Internal, "insert into db has been failed, taskID: %s", taskID)
+		return &task_servicepb.TaskID{Id: taskID}, status.Errorf(codes.Internal, "insert into db has been failed, taskID: %v", taskID)
 	}
 
 	return &task_servicepb.TaskID{Id: taskID}, nil
@@ -47,22 +46,22 @@ func (s *Server) UpdateTask(ctx context.Context, request *task_servicepb.Task) (
 	defer txn.Rollback()
 
 	count := 0
-	txn.QueryRowContext(ctx, "SELECT COUNT(*) FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.Task.CreatorUsername, request.Id.Id).Scan(&count)
+	txn.QueryRowContext(ctx, "SELECT COUNT(*) FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.Task.CreatorUsername, request.Id).Scan(&count)
 	if count == 0 {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.NotFound, "there is no task with ID=%s by user=%s", request.Id.Id, request.Task.CreatorUsername)
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.NotFound, "there is no task with ID=%v by user=%s", request.Id, request.Task.CreatorUsername)
 	}
 
-	_, err = txn.ExecContext(ctx, "UPDATE task_service_db SET title = $1, description = $2, status = $3 WHERE creator_username = $4 AND task_id = $5", request.Task.Title, request.Task.Description, request.Task.Status, request.Task.CreatorUsername, request.Id.Id)
+	_, err = txn.ExecContext(ctx, "UPDATE task_service_db SET title = $1, description = $2, status = $3 WHERE creator_username = $4 AND task_id = $5", request.Task.Title, request.Task.Description, request.Task.Status, request.Task.CreatorUsername, request.Id)
 	if err != nil {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.Internal, "failed to update task with ID=%s from user=%s", request.Id.Id, request.Task.CreatorUsername)
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.Internal, "failed to update task with ID=%v from user=%s", request.Id, request.Task.CreatorUsername)
 	}
 
 	err = txn.Commit()
 	if err != nil {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.Internal, "failed to commit transaction")
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.Internal, "failed to commit transaction")
 	}
 
-	return &task_servicepb.TaskID{Id: request.Id.Id}, nil
+	return &task_servicepb.TaskID{Id: request.Id}, nil
 }
 
 func (s *Server) DeleteTask(ctx context.Context, request *task_servicepb.RequestByID) (*task_servicepb.TaskID, error) {
@@ -73,37 +72,37 @@ func (s *Server) DeleteTask(ctx context.Context, request *task_servicepb.Request
 	defer txn.Rollback()
 
 	count := 0
-	txn.QueryRowContext(ctx, "SELECT COUNT(*) FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.RequestorUsername, request.Id.Id).Scan(&count)
+	txn.QueryRowContext(ctx, "SELECT COUNT(*) FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.RequestorUsername, request.Id).Scan(&count)
 	if count == 0 {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.NotFound, "there is no task with ID=%s by user=%s", request.Id.Id, request.RequestorUsername)
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.NotFound, "there is no task with ID=%v by user=%s", request.Id, request.RequestorUsername)
 	}
 
-	_, err = txn.ExecContext(ctx, "DELETE FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.RequestorUsername, request.Id.Id)
+	_, err = txn.ExecContext(ctx, "DELETE FROM task_service_db WHERE creator_username = $1 AND task_id = $2", request.RequestorUsername, request.Id)
 	if err != nil {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.Internal, "failed to delete task with ID=%s from user%s", request.Id.Id, request.RequestorUsername)
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.Internal, "failed to delete task with ID=%v from user%s", request.Id, request.RequestorUsername)
 	}
 
 	err = txn.Commit()
 	if err != nil {
-		return &task_servicepb.TaskID{Id: request.Id.Id}, status.Errorf(codes.Internal, "failed to commit transaction")
+		return &task_servicepb.TaskID{Id: request.Id}, status.Errorf(codes.Internal, "failed to commit transaction")
 	}
 
-	return &task_servicepb.TaskID{Id: request.Id.Id}, nil
+	return &task_servicepb.TaskID{Id: request.Id}, nil
 }
 
 func (s *Server) GetTaskById(ctx context.Context, request *task_servicepb.RequestByID) (*task_servicepb.Task, error) {
 	var title, description, taskStatus, creator string
-	err := s.db.QueryRowContext(ctx, "SELECT title, description, status, creator_username FROM task_service_db WHERE task_id = $1", request.Id.Id).Scan(&title, &description, &taskStatus, &creator)
+	err := s.db.QueryRowContext(ctx, "SELECT title, description, status, creator_username FROM task_service_db WHERE task_id = $1", request.Id).Scan(&title, &description, &taskStatus, &creator)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return &task_servicepb.Task{}, status.Errorf(codes.NotFound, "there is no task with ID=%s", request.Id.Id)
+			return &task_servicepb.Task{}, status.Errorf(codes.NotFound, "there is no task with ID=%v", request.Id)
 		} else {
-			return &task_servicepb.Task{}, status.Errorf(codes.Internal, "failed to get task with ID=%s", request.Id.Id)
+			return &task_servicepb.Task{}, status.Errorf(codes.Internal, "failed to get task with ID=%v", request.Id)
 		}
 	}
 
 	return &task_servicepb.Task{
-		Id: &task_servicepb.TaskID{Id: request.Id.Id},
+		Id: request.Id,
 		Task: &task_servicepb.TaskContent{
 			Title:           title,
 			Description:     description,
@@ -125,10 +124,10 @@ func (s *Server) GetTaskList(ctx context.Context, request *task_servicepb.TaskPa
 
 	for rows.Next() {
 		task := &task_servicepb.Task{
-			Id:   &task_servicepb.TaskID{},
+			Id:   0,
 			Task: &task_servicepb.TaskContent{},
 		}
-		err = rows.Scan(&task.Id.Id, &task.Task.Title, &task.Task.Description, &task.Task.Status, &task.Task.CreatorUsername)
+		err = rows.Scan(&task.Id, &task.Task.Title, &task.Task.Description, &task.Task.Status, &task.Task.CreatorUsername)
 
 		if err != nil {
 			return &task_servicepb.TaskList{}, status.Errorf(codes.Internal, "failed to read field in a row")

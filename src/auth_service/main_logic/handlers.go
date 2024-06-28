@@ -8,6 +8,7 @@ import (
 	"mongo_handlers"
 	"net/http"
 	"os"
+	"strconv"
 
 	"encoding/json"
 
@@ -299,12 +300,16 @@ func UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get variable from URL
-	task_id := mux.Vars(r)["task_id"]
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
+	}
+	taskID := int32(taskIDInt)
 
 	var task task_servicepb.Task
-	task.Id = &task_servicepb.TaskID{
-		Id: task_id,
-	}
+	task.Id = taskID
 	task.Task = &task_servicepb.TaskContent{
 		Title:           creds.Title,
 		Description:     creds.Description,
@@ -317,7 +322,7 @@ func UpdateTask(w http.ResponseWriter, r *http.Request) {
 	_, err = taskServiceClient.UpdateTask(context.Background(), &task)
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			err = fmt.Errorf("grpc request `UpdateTask` failed because task with id=%v doesn't exists or requestor is not an author. Error message: %w", task.Id.Id, err)
+			err = fmt.Errorf("grpc request `UpdateTask` failed because task with id=%v doesn't exists or requestor is not an author. Error message: %w", task.Id, err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			err = fmt.Errorf("grpc request `UpdateTask` failed with error message: %w", err)
@@ -349,9 +354,13 @@ func DeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get variable from URL
-	task_id := mux.Vars(r)["task_id"]
-
-	taskID := &task_servicepb.TaskID{Id: task_id}
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
+	}
+	taskID := int32(taskIDInt)
 
 	// Send request to Task Service by GRPC
 	// If requestor is not author of task then request returns error `NotFound`
@@ -392,15 +401,17 @@ func GetTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get variable from URL
-	task_id := mux.Vars(r)["task_id"]
-
-	taskID := task_servicepb.TaskID{
-		Id: task_id,
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
 	}
+	taskID := int32(taskIDInt)
 
 	// Send request to Task Service by GRPC
 	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
-		Id:                &taskID,
+		Id:                taskID,
 		RequestorUsername: username,
 	})
 	if err != nil {
@@ -497,12 +508,18 @@ func View(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get variable from URL
-	task_id := mux.Vars(r)["task_id"]
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
+	}
+	taskID := int32(taskIDInt)
 
 	// Send requset to Task Service by GRPC to get task's author name
 	// If task doesn't exists returns error `NotFound`
 	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
-		Id:                &task_servicepb.TaskID{Id: task_id},
+		Id:                taskID,
 		RequestorUsername: username, // ?? not neccessary, maybe remove?
 	})
 	if err != nil {
@@ -517,7 +534,7 @@ func View(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send view to Kafka
-	err = kafka_handlers.View(username, task_id, grpc_resp.Task.CreatorUsername)
+	err = kafka_handlers.View(username, taskID, grpc_resp.Task.CreatorUsername)
 	if err != nil {
 		err = fmt.Errorf("`view` message sending caused a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -545,12 +562,18 @@ func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get variable from URL
-	task_id := mux.Vars(r)["task_id"]
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
+	}
+	taskID := int32(taskIDInt)
 
 	// Send requset to Task Service by GRPC to get task's author name
 	// If task doesn't exists returns error `NotFound`
 	grpc_resp, err := taskServiceClient.GetTaskById(context.Background(), &task_servicepb.RequestByID{
-		Id:                &task_servicepb.TaskID{Id: task_id},
+		Id:                taskID,
 		RequestorUsername: username, // ?? not neccessary, maybe remove?
 	})
 	if err != nil {
@@ -565,7 +588,7 @@ func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send like to Kafka
-	err = kafka_handlers.Like(username, task_id, grpc_resp.Task.CreatorUsername)
+	err = kafka_handlers.Like(username, taskID, grpc_resp.Task.CreatorUsername)
 	if err != nil {
 		err = fmt.Errorf("`like` message sending caused a error: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

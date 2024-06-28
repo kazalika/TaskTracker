@@ -36,15 +36,15 @@ type UpdateTaskRequest struct {
 }
 
 type LikeRequest struct {
-	TaskID string `json:"post_id"`
+	TaskID int32 `json:"post_id"`
 }
 
 type ViewRequest struct {
-	TaskID string `json:"post_id"`
+	TaskID int32 `json:"post_id"`
 }
 
 type TaskID struct {
-	TaskID string `json:"task_id"`
+	TaskID int32 `json:"task_id"`
 }
 
 type TaskContent struct {

@@ -63,7 +63,7 @@ func CloseConnection() error {
 	return conn.Close()
 }
 
-func getTaskNumbericStat(task_id string, parameter string) (result uint64, err error) {
+func getTaskNumbericStat(task_id int32, parameter string) (result uint64, err error) {
 	if _, ok := statisticsNames[parameter]; !ok {
 		err = fmt.Errorf("there is not statistic named `%s`", parameter)
 		return 0, err
@@ -74,7 +74,7 @@ func getTaskNumbericStat(task_id string, parameter string) (result uint64, err e
 		COUNT(DISTINCT username)
 	FROM %s
 	WHERE
-		task_id = '%s';
+		task_id = %v;
 	`, parameter, task_id)
 
 	// Result should be 1 row
@@ -82,7 +82,7 @@ func getTaskNumbericStat(task_id string, parameter string) (result uint64, err e
 
 	if result == 0 {
 		// Task was not created yet
-		err = fmt.Errorf("task %s wasn't created yet", task_id)
+		err = fmt.Errorf("task %v wasn't created yet", task_id)
 		return
 	}
 
@@ -95,15 +95,15 @@ func getTaskNumbericStat(task_id string, parameter string) (result uint64, err e
 type Statistics map[string]any
 
 type TaskWithStatistics struct {
-	TaskID     string `json:"task_id"`
-	Author     string `json:"author"`
-	Statistics Statistics
+	TaskID     int32      `json:"task_id"`
+	Author     string     `json:"author"`
+	Statistics Statistics `json:"statistics"`
 }
 
-func GetTaskStatistics(task_id string) (statistics Statistics, err error) {
+func GetTaskStatistics(taskID int32) (statistics Statistics, err error) {
 	statistics = make(map[string]any)
 	for parameter := range statisticsNames {
-		v, err := getTaskNumbericStat(task_id, parameter)
+		v, err := getTaskNumbericStat(taskID, parameter)
 		if err != nil {
 			err = fmt.Errorf("`getTaskStat` failed with error: %w", err)
 			return nil, err

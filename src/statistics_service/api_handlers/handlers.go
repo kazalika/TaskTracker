@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -17,15 +18,21 @@ const (
 func GetTaskStatistics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	task_id := mux.Vars(r)["task_id"]
+	taskIdString := mux.Vars(r)["task_id"]
+	taskIDInt, err := strconv.Atoi(taskIdString)
+	if err != nil {
+		http.Error(w, "Task's Id should has type int32", http.StatusBadRequest)
+		return
+	}
+	taskID := int32(taskIDInt)
 
-	statistics, err := clickhouse_handlers.GetTaskStatistics(task_id)
+	statistics, err := clickhouse_handlers.GetTaskStatistics(taskID)
 	if err != nil {
 		err = fmt.Errorf("`GetTaskStatistics failed with message: %w", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	statistics["task_id"] = task_id
+	statistics["task_id"] = taskID
 
 	encoded, err := json.Marshal(statistics)
 	if err != nil {

@@ -38,15 +38,15 @@ func InitKafkaTopics() {
 	likes = getKafkaWriter(kafkaURL, "likes")
 }
 
-func CreateEmptyStatistics(taskID string, taskAuthor string) error {
+func CreateEmptyStatistics(taskID int32, taskAuthor string) error {
 	if err := Like(accountForCreatingEmptyStatistics, taskID, taskAuthor); err != nil {
 		return err
 	}
 	return View(accountForCreatingEmptyStatistics, taskID, taskAuthor)
 }
 
-func Like(liker string, taskID string, taskAuthor string) error {
-	encoded, err := json.Marshal(map[string]string{
+func Like(liker string, taskID int32, taskAuthor string) error {
+	encoded, err := json.Marshal(map[string]any{
 		"username":    liker,
 		"task_id":     taskID,
 		"task_author": taskAuthor, // for statistics
@@ -68,8 +68,8 @@ func Like(liker string, taskID string, taskAuthor string) error {
 	}
 }
 
-func View(viewer string, taskID string, taskAuthor string) error {
-	encoded, err := json.Marshal(map[string]string{
+func View(viewer string, taskID int32, taskAuthor string) error {
+	encoded, err := json.Marshal(map[string]any{
 		"username":    viewer,
 		"task_id":     taskID,
 		"task_author": taskAuthor, // for statistics

@@ -1,7 +1,7 @@
 
 CREATE TABLE IF NOT EXISTS views_queue (
   username String,
-  task_id String,
+  task_id Int32,
   task_author String
 ) ENGINE = Kafka
 SETTINGS kafka_broker_list = 'kafka:9092',
@@ -12,7 +12,7 @@ SETTINGS kafka_broker_list = 'kafka:9092',
 
 CREATE TABLE IF NOT EXISTS likes_queue (
   username String,
-  task_id String,
+  task_id Int32,
   task_author String
 ) ENGINE = Kafka
 SETTINGS kafka_broker_list = 'kafka:9092',
@@ -22,14 +22,14 @@ SETTINGS kafka_broker_list = 'kafka:9092',
 
 CREATE TABLE IF NOT EXISTS views (
   username String,
-  task_id String,
+  task_id Int32,
   task_author String
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (task_id, username);
 
 CREATE TABLE IF NOT EXISTS likes (
   username String,
-  task_id String,
+  task_id Int32,
   task_author String
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (task_id, username);
