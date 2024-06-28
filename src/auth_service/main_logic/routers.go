@@ -69,7 +69,7 @@ var routes = Routes{
 	Route{
 		"CreateTask",
 		"POST",
-		"/tasks/create",
+		"/tasks/",
 		CreateTask,
 	},
 
@@ -88,17 +88,17 @@ var routes = Routes{
 	},
 
 	Route{
-		"GetTask",
-		"GET",
-		"/tasks/{task_id}",
-		GetTask,
-	},
-
-	Route{
 		"GetTaskPage",
 		"GET",
 		"/tasks/page",
 		GetTaskPage,
+	},
+
+	Route{
+		"GetTask",
+		"GET",
+		"/tasks/{task_id}",
+		GetTask,
 	},
 
 	Route{

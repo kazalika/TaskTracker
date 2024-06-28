@@ -46,7 +46,6 @@ func GetTaskStatistics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(encoded)
-	w.WriteHeader(http.StatusOK)
 }
 
 func GetTop5Tasks(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +64,6 @@ func GetTop5Tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(encoded)
-	w.WriteHeader(http.StatusOK)
 }
 
 func GetTop3Users(w http.ResponseWriter, r *http.Request) {
@@ -83,5 +81,4 @@ func GetTop3Users(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(encoded)
-	w.WriteHeader(http.StatusOK)
 }

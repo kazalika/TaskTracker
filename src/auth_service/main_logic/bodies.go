@@ -23,13 +23,13 @@ type TaskListRequest struct {
 	PageSize int32 `json:"page_size"`
 }
 
-type CreateTaskBody struct {
+type CreateTaskRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
 }
 
-type UpdateTaskBody struct {
+type UpdateTaskRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`

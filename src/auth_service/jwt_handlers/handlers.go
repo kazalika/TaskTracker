@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	privateKeyPath = "/auth_service/jwt/signature/private_key.pem"
-	publicKeyPath  = "/auth_service/jwt/signature/public_key.pem"
+	privateKeyPath = "/auth_service/jwt_handlers/signature/private_key.pem"
+	publicKeyPath  = "/auth_service/jwt_handlers/signature/public_key.pem"
 )
 
 type JWTHandlers struct {
@@ -52,22 +52,21 @@ func NewAuthHandlers(jwtprivateFile string, jwtPublicFile string) *JWTHandlers {
 
 var h *JWTHandlers
 
-func InitJWTHandlers() {
+func InitJWTHandlers() error {
 	flag.Parse()
 
 	absoluteprivateFile, err := filepath.Abs(privateKeyPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
 	absolutePublicFile, err := filepath.Abs(publicKeyPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
 	h = NewAuthHandlers(absoluteprivateFile, absolutePublicFile)
+	return nil
 }
 
 func GetJWTHandlers() *JWTHandlers {

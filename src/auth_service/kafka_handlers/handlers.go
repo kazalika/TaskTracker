@@ -15,6 +15,13 @@ var (
 	likes *kafka.Writer
 )
 
+const (
+	// It should be some username that will never be used by users or for some another reason
+	accountForCreatingEmptyStatistics = "ACCOUNT_FOR_CREATING_EMPTY_STATISTICS"
+	// It's message which kafka send sometimes. When it occures should retry call
+	kafkaLeadershipErrorMessage = "[5] Leader Not Available: the cluster is in the middle of a leadership election and there is currently no leader for this partition and hence it is unavailable for writes"
+)
+
 func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
 	return &kafka.Writer{
 		Addr:                   kafka.TCP(kafkaURL),
@@ -23,7 +30,7 @@ func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
 	}
 }
 
-func InitKafkaConnections() {
+func InitKafkaTopics() {
 	kafkaURL := os.Getenv("KAFKA_URL")
 	log.Printf("Kafka's URL = %v", kafkaURL)
 
@@ -32,17 +39,17 @@ func InitKafkaConnections() {
 }
 
 func CreateEmptyStatistics(taskID string, taskAuthor string) error {
-	if err := Like("ADMIN_NICKNAME_HERE", taskID, taskAuthor); err != nil {
+	if err := Like(accountForCreatingEmptyStatistics, taskID, taskAuthor); err != nil {
 		return err
 	}
-	return View("ADMIN_NICKNAME_HERE", taskID, taskAuthor)
+	return View(accountForCreatingEmptyStatistics, taskID, taskAuthor)
 }
 
 func Like(liker string, taskID string, taskAuthor string) error {
 	encoded, err := json.Marshal(map[string]string{
 		"username":    liker,
 		"task_id":     taskID,
-		"task_author": taskAuthor,
+		"task_author": taskAuthor, // for statistics
 	})
 	if err != nil {
 		return err
@@ -55,7 +62,7 @@ func Like(liker string, taskID string, taskAuthor string) error {
 		if err == nil {
 			return nil
 		}
-		if err.Error() != "[5] Leader Not Available: the cluster is in the middle of a leadership election and there is currently no leader for this partition and hence it is unavailable for writes" {
+		if err.Error() != kafkaLeadershipErrorMessage {
 			return err
 		}
 	}
@@ -65,7 +72,7 @@ func View(viewer string, taskID string, taskAuthor string) error {
 	encoded, err := json.Marshal(map[string]string{
 		"username":    viewer,
 		"task_id":     taskID,
-		"task_author": taskAuthor,
+		"task_author": taskAuthor, // for statistics
 	})
 	if err != nil {
 		return err
@@ -78,13 +85,13 @@ func View(viewer string, taskID string, taskAuthor string) error {
 		if err == nil {
 			return nil
 		}
-		if err.Error() != "[5] Leader Not Available: the cluster is in the middle of a leadership election and there is currently no leader for this partition and hence it is unavailable for writes" {
+		if err.Error() != kafkaLeadershipErrorMessage {
 			return err
 		}
 	}
 }
 
-func CloseKafkaConnections() {
+func CloseKafkaTopics() {
 	views.Close()
 	likes.Close()
 }

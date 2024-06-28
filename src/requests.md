@@ -15,37 +15,37 @@ curl -v -X POST 'localhost:8080/register' \
 
 # Создание задачи от лица первого пользователя
 
-curl -v -X POST 'localhost:8080/tasks/create' \
+curl -v -X POST 'localhost:8080/tasks/' \
 --data '{"title": "title1", "description": "description is here", "status": "not taken" }' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 
 # Обновление задачи
 
-curl -v -X PUT 'localhost:8080/tasks/update/1' \
+curl -v -X PUT 'localhost:8080/tasks/1' \
 --data '{"title": "new title", "description": "new description is here", "status": "ready" }' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 
 # Получение задачи
 
-curl -v -X GET 'localhost:8080/tasks/get/1' \
+curl -v -X GET 'localhost:8080/tasks/1' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 
 # Получение списка задач с пагинацией.
 # Сначала создаем побольше задач (выполнить команду 5+ раз)
 
-curl -v -X POST 'localhost:8080/tasks/create' \
+curl -v -X POST 'localhost:8080/tasks/' \
 --data '{"title": "yet another title", "description": "yet another description", "status": "can be tested" }' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 
 # Получить 4 задачи, начиная со второй
 
-curl -v -X GET 'localhost:8080/tasks/getPage' \
+curl -v -X GET 'localhost:8080/tasks/page' \
 --data '{"offset": 1, "page_size": 4}' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 
 # Удалим вторую задачу
 
-curl -v -X DELETE 'localhost:8080/tasks/delete/2' \
+curl -v -X DELETE 'localhost:8080/tasks/2' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxIn0.Y7Wj5wTt436YCt-pncka4D49z5qkWvE-NzrFC3HN2D8fW1pcjFCpMknXcJjlcrMmxjPMGe4U1g1h1Nc6OO90yLCS5nDfELy3cbCDuwnfm5RdZIMPZdZkCgxa9GkIrwQor96_64P8DppBUxdkv-soUTGA9h5zf0lvsjVuadZzm7R0uRIIr3S4hIw7ky_n0Q7UzaWQgkBkj0kD6IBnHAxovMm2DROW-EoHL6lJESJvdqPDrghlbdADBKDYT9tfSk2i-UEwAsLk2iC2hXVyGp-g50mLMW_ZtMH13J5JxT0kYlszgxrHwzQkcby4MA3yNPuseAMuakI9MR6DDqS5i_1jeQ'
 ```
 
@@ -110,7 +110,7 @@ curl -v -X GET 'localhost:8080/top/tasks/views' \
 
 # Создание задачи вторым пользователем и его просмотры
 
-curl -v -X POST 'localhost:8080/tasks/create' \
+curl -v -X POST 'localhost:8080/tasks/' \
 --data '{"title": "title2", "description": "description is here", "status": "not taken" }' \
 -H 'Cookie: token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIyIn0.gzGjO7HorgmfOv4uplH8GzRBk8kHNgL_C0A8FU9wDQ-Y2V2veTNqretg63IyFicIUCgqWz4Vsnx-nv-jpMtx1hKIMfC8NWQW3AXgp-Qy6lTLmiqeLpIzK8dz13AaM80Kq7O80La27yyMBaSMSWicSTj7dctb38vQJuqBbFjscpgPnrgqHqe2y8_Gl2CszTyarYUZ0AGTyFCRt4UzEQ5p6ZFG_AmHo5_-P2zNidpIYYXkbbzq4F8h111hKXVzOUG2-b1EJjT2rCUz2uLul3ZNDVDCTGld3RYOix6oO68SHrZgBuGs3tvia8PMxeN6Fa1Vo7TxCY-v2AQTARHziz_wZA'
 

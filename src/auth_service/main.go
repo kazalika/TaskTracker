@@ -5,28 +5,29 @@ import (
 	"log"
 	"net/http"
 
-	sw "auth_service/go"
+	main_logic "auth_service/main_logic"
 	"jwt_handlers"
-	"mongo"
+	"mongo_handlers"
 )
 
 func main() {
-	log.Printf("Server starting")
+	log.Printf("[0/3]: Server starting...")
 
-	mongo.InitMongoClient()
-	log.Printf("Mongo client initialized")
+	if err := mongo_handlers.InitMongoClient(); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("[1/3]: Mongo client initialized")
+	defer mongo_handlers.CloseMongoClient()
 
-	defer mongo.CloseMongoClient()
+	if err := jwt_handlers.InitJWTHandlers(); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("[2/3]: JWT Handlers initialized")
 
-	jwt_handlers.InitJWTHandlers()
-	log.Printf("JWT Handlers initialized")
+	kafka_handlers.InitKafkaTopics()
+	log.Printf("[3/3]: Kafka topics initialized")
+	defer kafka_handlers.CloseKafkaTopics()
 
-	kafka_handlers.InitKafkaConnections()
-	log.Printf("Kafka connections initialized")
-
-	defer kafka_handlers.CloseKafkaConnections()
-
-	router := sw.NewRouter()
-
+	router := main_logic.NewRouter()
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

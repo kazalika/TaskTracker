@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kafka_handlers"
 	"log"
+	"mongo_handlers"
 	"net/http"
 	"os"
 
@@ -58,7 +59,7 @@ func Authenticate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	storedUserData := make(map[string]string)
-	code, err := GetUserData(creds.Username, &storedUserData)
+	code, err := mongo_handlers.GetUserData(creds.Username, &storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -76,11 +77,16 @@ func Authenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	storedUserData["token"] = tokenString
-
-	code, err = StoreUserData(creds.Username, storedUserData)
+	code, err = mongo_handlers.StoreUserToken(creds.Username, tokenString)
 	if err != nil {
 		http.Error(w, err.Error(), code)
+		return
+	}
+
+	code, err = mongo_handlers.StoreUserData(creds.Username, storedUserData)
+	if err != nil {
+		http.Error(w, err.Error(), code)
+		return
 	}
 
 	cookie := http.Cookie{
@@ -111,27 +117,33 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if CheckIfUserExists(creds.Username) {
+	if mongo_handlers.CheckIfUserExists(creds.Username) {
 		http.Error(w, "User with this Username does already exist", http.StatusBadRequest)
 		return
 	}
 
-	// Generating JWT token
-	tokenString, err := GenerateJWTToken(creds.Username)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Store new user's data to storage
 	newUserData := map[string]string{
 		"username": creds.Username,
 		"password": HashPassword(creds.Password),
-		"token":    tokenString,
 	}
-	code, err := StoreUserData(creds.Username, newUserData)
+	code, err := mongo_handlers.StoreUserData(creds.Username, newUserData)
 	if err != nil {
+		err = fmt.Errorf("error in function `StoreUserData` occurred: %w", err)
 		http.Error(w, err.Error(), code)
+		return
+	}
+
+	tokenString, err := GenerateJWTToken(creds.Username)
+	if err != nil {
+		err = fmt.Errorf("error in function `GenerateJWTToken` occurred: %w", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	code, err = mongo_handlers.StoreUserToken(creds.Username, tokenString)
+	if err != nil {
+		err = fmt.Errorf("error in function `StoreUserToken` occurred: %w", err)
+		http.Error(w, err.Error(), code)
+		return
 	}
 
 	// Make Cookie
@@ -154,10 +166,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 func UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his information
 	var username string
+	code, err := CheckIfUserAuthenticated(r, &username)
+	if err != nil {
+		http.Error(w, err.Error(), code)
+		return
+	}
+
 	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err = mongo_handlers.GetUserData(username, &storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -189,7 +206,7 @@ func UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store updated info into Mongo
-	code, err = StoreUserData(username, storedUserData)
+	code, err = mongo_handlers.StoreUserData(username, storedUserData)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 	}
@@ -207,18 +224,16 @@ func UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 func CreateTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
 	}
 
 	// Decoding request body
-	var creds CreateTaskBody
+	var creds CreateTaskRequest
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -254,7 +269,6 @@ func CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(http_resp_bytes)
-	w.WriteHeader(http.StatusOK)
 }
 
 // CreateTask handler
@@ -268,18 +282,16 @@ func CreateTask(w http.ResponseWriter, r *http.Request) {
 func UpdateTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
 	}
 
 	// Decoding request body
-	var creds UpdateTaskBody
+	var creds UpdateTaskRequest
 	err = json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -315,7 +327,6 @@ func UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Task has been updated succesfully\n"))
-	w.WriteHeader(http.StatusOK)
 }
 
 // DeleteTask handler
@@ -329,11 +340,9 @@ func UpdateTask(w http.ResponseWriter, r *http.Request) {
 func DeleteTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -362,7 +371,6 @@ func DeleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Task has been deleted succesfully"))
-	w.WriteHeader(http.StatusOK)
 }
 
 // GetTask handler
@@ -375,11 +383,9 @@ func DeleteTask(w http.ResponseWriter, r *http.Request) {
 func GetTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -422,7 +428,6 @@ func GetTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(http_resp_bytes)
-	w.WriteHeader(http.StatusOK)
 }
 
 // GetTaskPage handler
@@ -435,11 +440,9 @@ func GetTask(w http.ResponseWriter, r *http.Request) {
 func GetTaskPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -474,7 +477,6 @@ func GetTaskPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(jsonStr))
-	w.WriteHeader(http.StatusOK)
 }
 
 // View handler
@@ -486,11 +488,9 @@ func GetTaskPage(w http.ResponseWriter, r *http.Request) {
 func View(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -525,7 +525,6 @@ func View(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Task has been viewed succesfully\n"))
-	w.WriteHeader(http.StatusOK)
 }
 
 // Like handler
@@ -537,11 +536,9 @@ func View(w http.ResponseWriter, r *http.Request) {
 func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -576,7 +573,6 @@ func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("Task has been liked succesfully\n"))
-	w.WriteHeader(http.StatusOK)
 }
 
 // GetTaskStats handler
@@ -588,11 +584,9 @@ func LikeTaskPost(w http.ResponseWriter, r *http.Request) {
 func GetTaskStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -609,7 +603,6 @@ func GetTaskStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Copy response to ResponseWriter
 	CopyResponseToWriter(w, resp)
 }
 
@@ -622,11 +615,9 @@ func GetTaskStats(w http.ResponseWriter, r *http.Request) {
 func GetTopTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
+	// Check if user is authenticated and get his username
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -643,7 +634,6 @@ func GetTopTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Copy response to ResponseWriter
 	CopyResponseToWriter(w, resp)
 }
 
@@ -657,10 +647,8 @@ func GetTopUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// Check if user is authenticated and get his info
-	// ?? can we don't load his info? it's unused variable actually
 	var username string
-	storedUserData := make(map[string]string)
-	code, err := CheckIfUserAuthenticated(r, &username, &storedUserData)
+	code, err := CheckIfUserAuthenticated(r, &username)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -674,6 +662,5 @@ func GetTopUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Copy response to ResponseWriter
 	CopyResponseToWriter(w, resp)
 }

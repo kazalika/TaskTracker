@@ -1,4 +1,4 @@
-module kafka
+module kafka_handlers
 
 go 1.18
 
